@@ -12,6 +12,7 @@ from lib.model.ModelFactory import model_factory
 from lib.utils.drawing import draw_bbox,draw_text,crop_img
 from lib.dataloader.VideoDataloader import VideoLoader,VideoWriter
 
+
 # Video Path
 video_path = 'data/sample/ori.MOV'
 output_path = 'data/sample/res.mp4'
@@ -53,6 +54,16 @@ writer = VideoWriter(output_path)
 writer.init_from_videoloader(imgs)
 
 # ================================================================================================
+xml = dict()
+xml['Video Path'] = video_path
+xml['Type'] = os.path.splitext(video_path)[-1]
+xml['Width'] = imgs.width
+xml['Height'] = imgs.height
+xml['FrameRateMS'] = imgs.fps
+xml['DurationMS'] = imgs.frames/imgs.fps
+xml['frames'] = []
+
+# ================================================================================================
 
 # for every frame
 for frame_id,img in enumerate(tqdm(imgs)):
@@ -62,8 +73,21 @@ for frame_id,img in enumerate(tqdm(imgs)):
 	result = model['vehicle'].run(rgb_img)
 	result = model['tracking'].run(rgb_img,result)
 
+	xml_frame = dict()
+	xml_frame['delayMS'] = frame_id/imgs.fps
+	xml_frame['ID'] = frame_id
+	xml_frame['Vehicle'] = []
+
 	# for every vehicle
 	for bbox in result:
+
+		xml_vehicle = dict()
+		xml_vehicle['ID'] = str(bbox[-1])
+		xml_vehicle['X'] = bbox[0][0]
+		xml_vehicle['Y'] = bbox[0][1]
+		xml_vehicle['Width'] = bbox[0][2]
+		xml_vehicle['Height'] = bbox[0][3]
+		xml_vehicle['LP'] = []
 
 		# draw vehicle box and id
 		img = draw_bbox(img,*bbox[0])
@@ -92,5 +116,23 @@ for frame_id,img in enumerate(tqdm(imgs)):
 			if len(ocr_result) > 0 :
 				ocr_text,ocr_conf = ocr_result
 				img = draw_text(img,str(ocr_text),*lp[0],color=(0,255,0),size=0.5,thickness=1)
+				xml_LP['OCR'] = str(ocr_text)
+				xml_LP['OcrProbability'] = str(ocr_conf)
 
+			xml_LP['X'] = lp[0][0]
+			xml_LP['Y'] = lp[0][1]
+			xml_LP['Width'] = lp[0][2]
+			xml_LP['Height'] = lp[0][3]
+
+			xml_vehicle['LP'].append(xml_LP)
+
+		xml_frame['Vehicle'].append(xml_vehicle)
+
+	xml['frames'].append(xml_frame)
 	writer.update(img)
+
+xml = dict2xml(xml, wrap ='Video', indent ="\t")
+
+xmlfile = open("ALPR_sample.xml", "w")
+xmlfile.write(xml)
+xmlfile.close()
